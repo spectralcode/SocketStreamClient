@@ -63,6 +63,8 @@ public slots:
 	void updateParamsAndConnect(ReceiverParameters params);
 	void onConnect();
 	void onDisconnect();
+	void onRemoteStartClicked();
+	void onRemoteStopClicked();
 
 signals:
 	void dataAvailable(void* data, unsigned int bitDepth, unsigned int width, unsigned int height);

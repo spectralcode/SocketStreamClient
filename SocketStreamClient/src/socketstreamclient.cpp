@@ -55,6 +55,11 @@ SocketStreamClient::SocketStreamClient(QWidget *parent)
 	connect(this->receiver, &DataReceiver::dataAvailable, this->imgDisplay, &ImageDisplay::receiveFrame);
 	connect(this->receiver, &DataReceiver::connected, this, &SocketStreamClient::disableGui);
 	connect(&receiverThread, &QThread::finished, this->receiver, &DataReceiver::deleteLater);
+	
+	connect(this->ui->pushButton_remoteStart, &QPushButton::clicked, this->receiver, &DataReceiver::onRemoteStartClicked);
+	connect(this->ui->pushButton_remoteStop, &QPushButton::clicked, this->receiver, &DataReceiver::onRemoteStopClicked);
+
+	
 	receiverThread.start();
 }
 
@@ -83,6 +88,7 @@ void SocketStreamClient::disableGui(bool disable) {
 	this->ui->lineEdit_port->setDisabled(disable);
 	this->ui->pushButton_connect->setDisabled(disable);
 	this->ui->pushButton_disconnect->setDisabled(!disable);
+	this->ui->groupBox_remoteControl->setDisabled(!disable);
 }
 
 

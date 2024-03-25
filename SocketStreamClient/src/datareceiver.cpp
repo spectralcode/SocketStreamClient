@@ -96,3 +96,12 @@ void DataReceiver::onDisconnect() {
 	socket->disconnectFromHost();
 	bytesWritten = 0; //reset write position for new data
 }
+
+void DataReceiver::onRemoteStartClicked() {
+	socket->write("remote_start");
+}
+
+
+void DataReceiver::onRemoteStopClicked() {
+	socket->write("remote_stop");
+}
