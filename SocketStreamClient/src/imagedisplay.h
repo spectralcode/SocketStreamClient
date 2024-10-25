@@ -34,6 +34,9 @@
 #include <QKeyEvent>
 #include <QWheelEvent>
 #include <QtMath>
+#include <QTimer>
+#include <QContextMenuEvent>
+#include <QLabel>
 #include "bitdepthconverter.h"
 
 class ImageDisplay : public QGraphicsView
@@ -51,6 +54,7 @@ private:
 	void mouseMoveEvent(QMouseEvent* event) override;
 	void keyPressEvent(QKeyEvent* event) override;
 	void wheelEvent(QWheelEvent* event) override;
+	void contextMenuEvent(QContextMenuEvent* event) override;
 	void scaleView(qreal scaleFactor);
 
 private:
@@ -61,12 +65,23 @@ private:
 	int frameHeight;
 	int mousePosX;
 	int mousePosY;
+	
+	bool showFps;
+	QLabel* fpsLabel;	
+	QGraphicsTextItem* fpsTextItem;
+	QTimer fpsTimer;
+	int frameCount;
+	double currentFps;
+	int fpsTimeInterval;
 
 public slots:
 	void zoomIn();
 	void zoomOut();
 	void receiveFrame(void* frame, unsigned int bitDepth, unsigned int samplesPerLine, unsigned int linesPerFrame);
 	void displayFrame(uchar* frame, unsigned int samplesPerLine, unsigned int linesPerFrame);
+
+private slots:
+	void updateFps();
 
 signals:
 	void non8bitFrameReceived(void *frame, unsigned int bitDepth, unsigned int samplesPerLine, unsigned int linesPerFrame);

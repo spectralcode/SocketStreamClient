@@ -28,6 +28,8 @@
 #define BITDEPTHCONVERTER_H
 
 #include <QObject>
+#include <QSharedPointer>
+#include <QByteArray>
 
 class BitDepthConverter : public QObject
 {
@@ -43,7 +45,7 @@ private:
 	bool conversionRunning;
 
 public slots:
-	void convertDataTo8bit(void *inputData, int bitDepth, int samplesPerLine, int linesPerFrame);
+	void convertDataTo8bit(void* inputData, int bitDepth, int samplesPerLine, int linesPerFrame);
 
 signals:
 	void converted8bitData(uchar *output8bitData, unsigned int samplesPerLine, unsigned int linesPerFrame);

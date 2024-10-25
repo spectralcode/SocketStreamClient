@@ -27,19 +27,23 @@
 #ifndef DATARECEIVER_H
 #define DATARECEIVER_H
 
-#define BUFFERS 2
+#define BUFFERS 200
 
 #include <QObject>
 #include <QTcpSocket>
+#include <QByteArray>
+#include <QDataStream>
+#include <QVector>
 
 
 struct ReceiverParameters {
 	QString ip;
 	qint16 port;
 	int bitDepth;
-	int samplesPerLine ;
+	int samplesPerLine;
 	int linesPerFrame;
 	int framesPerBuffer;
+	bool useHeaders;
 };
 
 class DataReceiver : public QObject
@@ -52,10 +56,24 @@ public:
 private:
 	QTcpSocket* socket;
 	ReceiverParameters params;
-	QVector<QByteArray> buffers;
+	QVector<QByteArray> frameDataBuffers;
 	int bufferSize = 0;
 	int currentIndex = 0;
 	int bytesWritten = 0;
+
+	QByteArray buffer;
+	quint32 currentFrameSize;
+	quint16 currentFrameWidth;
+	quint16 currentFrameHeight;
+	quint8 currentBitDepth;
+
+	enum class State {
+		AwaitingHeader,
+		AwaitingFrame
+	} state = State::AwaitingHeader;
+
+	void processBuffer();
+	void processBufferWithHeader();
 
 public slots:
 	void readIncomingData();
@@ -65,10 +83,12 @@ public slots:
 	void onDisconnect();
 	void onRemoteStartClicked();
 	void onRemoteStopClicked();
+	void setUseHeaders(bool enable);
 
 signals:
-	void dataAvailable(void* data, unsigned int bitDepth, unsigned int width, unsigned int height);
+	void dataAvailable(uchar* data, unsigned int bitDepth, unsigned int width, unsigned int height);
 	void connected(bool);
+	void paramsChanged(ReceiverParameters params);
 
 };
 

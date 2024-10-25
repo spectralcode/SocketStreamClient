@@ -7,14 +7,14 @@
     <x>0</x>
     <y>0</y>
     <width>295</width>
-    <height>560</height>
+    <height>584</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>SocketStreamClient</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_2">
+   <layout class="QVBoxLayout" name="verticalLayout_3">
     <item>
      <widget class="QGroupBox" name="groupBox_dataSettings">
       <property name="sizePolicy">
@@ -26,11 +26,8 @@
       <property name="title">
        <string>Receiving Data Settings</string>
       </property>
-      <layout class="QFormLayout" name="formLayout">
-       <property name="horizontalSpacing">
-        <number>6</number>
-       </property>
-       <property name="verticalSpacing">
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <property name="spacing">
         <number>3</number>
        </property>
        <property name="leftMargin">
@@ -45,76 +42,90 @@
        <property name="bottomMargin">
         <number>6</number>
        </property>
-       <item row="0" column="0">
-        <widget class="QLabel" name="label_6">
+       <item>
+        <widget class="QCheckBox" name="checkBox_header">
          <property name="text">
-          <string>Bit depth: </string>
+          <string>Use header information from data stream</string>
          </property>
         </widget>
        </item>
-       <item row="0" column="1">
-        <widget class="QSpinBox" name="spinBox_bitdepth">
-         <property name="minimum">
-          <number>8</number>
+       <item>
+        <layout class="QFormLayout" name="formLayout">
+         <property name="verticalSpacing">
+          <number>3</number>
          </property>
-         <property name="maximum">
-          <number>32</number>
-         </property>
-         <property name="value">
-          <number>16</number>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
-        <widget class="QLabel" name="label_3">
-         <property name="text">
-          <string>Samples per A-scan: </string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1">
-        <widget class="QSpinBox" name="spinBox_samplesPerAscan">
-         <property name="maximum">
-          <number>8192</number>
-         </property>
-         <property name="value">
-          <number>512</number>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="label_4">
-         <property name="text">
-          <string>A-scans per B-scan: </string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1">
-        <widget class="QSpinBox" name="spinBox_AscansPerBscan">
-         <property name="maximum">
-          <number>8192</number>
-         </property>
-         <property name="value">
-          <number>512</number>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QLabel" name="label_5">
-         <property name="text">
-          <string>B-scans per Buffer: </string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="1">
-        <widget class="QSpinBox" name="spinBox_BscansPerBuffer">
-         <property name="maximum">
-          <number>8192</number>
-         </property>
-         <property name="value">
-          <number>64</number>
-         </property>
-        </widget>
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_6">
+           <property name="text">
+            <string>Bit depth: </string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QSpinBox" name="spinBox_bitdepth">
+           <property name="minimum">
+            <number>8</number>
+           </property>
+           <property name="maximum">
+            <number>32</number>
+           </property>
+           <property name="value">
+            <number>16</number>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_3">
+           <property name="text">
+            <string>Samples per A-scan: </string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QSpinBox" name="spinBox_samplesPerAscan">
+           <property name="maximum">
+            <number>8192</number>
+           </property>
+           <property name="value">
+            <number>512</number>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="label_4">
+           <property name="text">
+            <string>A-scans per B-scan: </string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QSpinBox" name="spinBox_AscansPerBscan">
+           <property name="maximum">
+            <number>8192</number>
+           </property>
+           <property name="value">
+            <number>512</number>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="0">
+          <widget class="QLabel" name="label_5">
+           <property name="text">
+            <string>B-scans per Buffer: </string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="1">
+          <widget class="QSpinBox" name="spinBox_BscansPerBuffer">
+           <property name="maximum">
+            <number>8192</number>
+           </property>
+           <property name="value">
+            <number>64</number>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
      </widget>

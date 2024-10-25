@@ -31,8 +31,9 @@
 SocketStreamClient::SocketStreamClient(QWidget *parent)
 	: QMainWindow(parent)
 	, ui(new Ui::SocketStreamClient)
+	, connected(false)
 {
-	qRegisterMetaType<ReceiverParameters >("ReceiverParameters");
+	qRegisterMetaType<ReceiverParameters>("ReceiverParameters");
 	ui->setupUi(this);
 	this->imgDisplay = this->ui->widget_imagedisplay;
 	this->setValidators();
@@ -45,6 +46,7 @@ SocketStreamClient::SocketStreamClient(QWidget *parent)
 		this->params.linesPerFrame = this->ui->spinBox_AscansPerBscan->value();
 		this->params.samplesPerLine = this->ui->spinBox_samplesPerAscan->value();
 		this->params.framesPerBuffer = this->ui->spinBox_BscansPerBuffer->value();
+		this->params.useHeaders = this->ui->checkBox_header->isChecked();
 		emit updateParamsAndConnect(this->params);
 	});
 
@@ -54,12 +56,23 @@ SocketStreamClient::SocketStreamClient(QWidget *parent)
 	connect(this->ui->pushButton_disconnect, &QPushButton::clicked, this->receiver, &DataReceiver::onDisconnect);
 	connect(this->receiver, &DataReceiver::dataAvailable, this->imgDisplay, &ImageDisplay::receiveFrame);
 	connect(this->receiver, &DataReceiver::connected, this, &SocketStreamClient::disableGui);
+	connect(this->receiver, &DataReceiver::paramsChanged, this, &SocketStreamClient::updateParamsInGui);
 	connect(&receiverThread, &QThread::finished, this->receiver, &DataReceiver::deleteLater);
-	
+
 	connect(this->ui->pushButton_remoteStart, &QPushButton::clicked, this->receiver, &DataReceiver::onRemoteStartClicked);
 	connect(this->ui->pushButton_remoteStop, &QPushButton::clicked, this->receiver, &DataReceiver::onRemoteStopClicked);
 
-	
+	connect(this->ui->checkBox_header, &QCheckBox::clicked, this, [this](bool checked) {
+		if(!this->connected){
+			this->ui->spinBox_bitdepth->setDisabled(checked);
+			this->ui->spinBox_AscansPerBscan->setDisabled(checked);
+			this->ui->spinBox_samplesPerAscan->setDisabled(checked);
+			this->ui->spinBox_BscansPerBuffer->setDisabled(checked);
+		}
+		this->receiver->setUseHeaders(checked);
+		//QMetaObject::invokeMethod(this->receiver, "setUseHeaders", Qt::QueuedConnection, Q_ARG(bool, checked));
+	});
+
 	receiverThread.start();
 }
 
@@ -71,7 +84,7 @@ SocketStreamClient::~SocketStreamClient()
 }
 
 void SocketStreamClient::setValidators() {
-	QString ipRange = "(([ 0]+)|([ 0]*[0-9] *)|([0-9][0-9] )|([ 0][0-9][0-9])|(1[0-9][0-9])|([2][0-4][0-9])|(25[0-5]))";
+	QString ipRange = "(([0]{1,3})|([0]{0,2}[1-9]{1})|([0]{0,1}[1-9]{1}[0-9]{1})|(1[0-9]{2})|([2][0-4][0-9])|(25[0-5]))";
 	QRegExp ipRegex("^" + ipRange
 					+ "\\." + ipRange
 					+ "\\." + ipRange
@@ -79,7 +92,7 @@ void SocketStreamClient::setValidators() {
 	QRegExpValidator *ipValidator = new QRegExpValidator(ipRegex, this);
 	this->ui->lineEdit_ip->setValidator(ipValidator);
 
-	this->ui->lineEdit_port->setValidator(new QIntValidator(0, 65353, this));
+	this->ui->lineEdit_port->setValidator(new QIntValidator(0, 65535, this));
 }
 
 void SocketStreamClient::disableGui(bool disable) {
@@ -89,6 +102,17 @@ void SocketStreamClient::disableGui(bool disable) {
 	this->ui->pushButton_connect->setDisabled(disable);
 	this->ui->pushButton_disconnect->setDisabled(!disable);
 	this->ui->groupBox_remoteControl->setDisabled(!disable);
+	this->connected = disable;
+}
+
+void SocketStreamClient::updateParamsInGui(ReceiverParameters params) {
+	this->ui->lineEdit_ip->setText(params.ip);
+	this->ui->lineEdit_port->setText(QString::number(params.port));
+	this->ui->spinBox_bitdepth->setValue(params.bitDepth);
+	this->ui->spinBox_AscansPerBscan->setValue(params.linesPerFrame);
+	this->ui->spinBox_samplesPerAscan->setValue(params.samplesPerLine);
+	this->ui->spinBox_BscansPerBuffer->setValue(params.framesPerBuffer);
+	this->ui->checkBox_header->setChecked(params.useHeaders);
 }
 
 

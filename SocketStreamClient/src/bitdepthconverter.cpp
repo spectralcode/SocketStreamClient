@@ -42,7 +42,7 @@ BitDepthConverter::~BitDepthConverter()
 	}
 }
 
-void BitDepthConverter::convertDataTo8bit(void *inputData, int bitDepth, int samplesPerLine, int linesPerFrame) {
+void BitDepthConverter::convertDataTo8bit(void* inputData, int bitDepth, int samplesPerLine, int linesPerFrame) {
 	if(!this->conversionRunning){
 		this->conversionRunning = true;
 		int length = samplesPerLine * linesPerFrame;
@@ -51,6 +51,7 @@ void BitDepthConverter::convertDataTo8bit(void *inputData, int bitDepth, int sam
 		if(this->output8bitData == nullptr || this->bitDepth != bitDepth || this->length != length){
 			if(bitDepth == 0 || length == 0){
 				emit error(tr("BitDepthConverter: Invalid data dimensions!"));
+				this->conversionRunning = false;
 				return;
 			}
 			this->bitDepth = bitDepth;
@@ -63,9 +64,7 @@ void BitDepthConverter::convertDataTo8bit(void *inputData, int bitDepth, int sam
 		}
 		//no conversion needed if inputData is already 8bit or below
 		if (bitDepth <= 8){
-			for(int i=0; i<length; i++){
-				this->output8bitData[i] = static_cast<ushort*>(inputData)[i]; //todo: replace this for loop by memcpy
-			}
+			memcpy(this->output8bitData, static_cast<char*>(inputData), length * sizeof(char));
 		}
 		//convert to 8 bit element by element
 		else if (bitDepth >= 9 && bitDepth <=16){
@@ -86,6 +85,7 @@ void BitDepthConverter::convertDataTo8bit(void *inputData, int bitDepth, int sam
 		}
 
 		emit converted8bitData(output8bitData, samplesPerLine, linesPerFrame);
+		free(inputData); //todo:Rethink memory management. Memory for 'inputData' is allocated in 'dataReceiver'.Explore options for allowing 'dataReceiver' to also handle freeing this memory.
 		this->conversionRunning = false;
 	}
 }

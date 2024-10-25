@@ -25,6 +25,13 @@
 **/
 
 #include "imagedisplay.h"
+#include <QDebug>
+
+#include "imagedisplay.h"
+#include <QDebug>
+#include <QContextMenuEvent>
+#include <QMenu>
+#include <QAction>
 
 ImageDisplay::ImageDisplay(QWidget *parent) : QGraphicsView(parent)
 {
@@ -55,6 +62,24 @@ ImageDisplay::ImageDisplay(QWidget *parent) : QGraphicsView(parent)
 	connect(this->bitConverter, &BitDepthConverter::converted8bitData, this, &ImageDisplay::displayFrame);
 	connect(&converterThread, &QThread::finished, this->bitConverter, &BitDepthConverter::deleteLater);
 	converterThread.start();
+
+	//setup FPS display
+	this->showFps = false;
+	this->frameCount = 0;
+	this->currentFps = 0.0;
+	this->fpsLabel = new QLabel(this);
+	this->fpsLabel->setStyleSheet("QLabel { color : white; background-color: rgba(0, 0, 0, 128); }");
+	this->fpsLabel->setText("FPS: 0            ");
+	this->fpsLabel->setFont(QFont("Arial", 14, QFont::Bold));
+	this->fpsLabel->move(10, 10);
+	this->fpsLabel->setVisible(showFps); 
+	this->fpsLabel->raise();
+
+
+	// Setup FPS Timer
+	connect(&fpsTimer, &QTimer::timeout, this, &ImageDisplay::updateFps);
+	this->fpsTimeInterval = 2000;
+	fpsTimer.start(this->fpsTimeInterval);
 }
 
 ImageDisplay::~ImageDisplay()
@@ -135,11 +160,11 @@ void ImageDisplay::zoomOut() {
 }
 
 void ImageDisplay::receiveFrame(void *frame, unsigned int bitDepth, unsigned int samplesPerLine, unsigned int linesPerFrame) {
-	if(bitDepth != 8){
+	//if(bitDepth != 8){
 		emit non8bitFrameReceived(frame, bitDepth, samplesPerLine, linesPerFrame);
-	}else{
-		this->displayFrame(static_cast<uchar*>(frame), samplesPerLine, linesPerFrame);
-	}
+	//}else{
+	//	this->displayFrame(static_cast<uchar*>(frame), samplesPerLine, linesPerFrame);
+	//}
 }
 
 void ImageDisplay::displayFrame(uchar* frame, unsigned int samplesPerLine, unsigned int linesPerFrame) {
@@ -158,4 +183,27 @@ void ImageDisplay::displayFrame(uchar* frame, unsigned int samplesPerLine, unsig
 		//set scene rect back to minimal size
 		this->scene->setSceneRect(this->scene->itemsBoundingRect());
 	}
+
+	// Increment frame count for FPS calculation
+	frameCount++;
+}
+
+void ImageDisplay::updateFps() {
+	currentFps = static_cast<double>(frameCount)/(this->fpsTimeInterval/1000);
+	frameCount = 0;
+
+	if(showFps){
+		//fpsLabel->setText(" " + QString::number(currentFps));
+		fpsLabel->setText(QString("FPS: %1").arg(currentFps, 0, 'f', 0));
+	}
+}
+
+void ImageDisplay::contextMenuEvent(QContextMenuEvent* event) {
+	QMenu menu(this);
+	QAction* toggleFpsAction = menu.addAction(showFps ? "Disable FPS display" : "Enable FPS display");
+	connect(toggleFpsAction, &QAction::triggered, this, [this]() {
+		showFps = !showFps;
+		fpsLabel->setVisible(showFps);
+	});
+	menu.exec(event->globalPos());
 }

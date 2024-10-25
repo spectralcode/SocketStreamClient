@@ -55,12 +55,14 @@ private:
 	ImageDisplay* imgDisplay;
 	DataReceiver* receiver;
 	ReceiverParameters params;
+	bool connected;
 
 private:
 	void setValidators();
 	void disableGui(bool disable);
 
 public slots:
+	void updateParamsInGui(ReceiverParameters params);
 
 signals:
 	void updateParamsAndConnect(ReceiverParameters);

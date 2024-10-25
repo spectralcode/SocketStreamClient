@@ -26,45 +26,142 @@
 
 #include "datareceiver.h"
 #include <QtMath>
+#include <QDataStream>
+#include <QDebug>
 
-DataReceiver::DataReceiver(QObject *parent) : QObject(parent), socket(new QTcpSocket(this)) {
+const quint32 MAGIC_NUMBER = 299792458; // used as startIdentifier
+const int HEADER_SIZE = 4 + 4 + 2 + 2 + 1; // startIdentifier + bufferSizeInBytes + frameWidth + frameHeight + bitDepth
+const quint32 MAX_ALLOWED_SIZE = 4 * 4096 * 4096 * 8;
+
+DataReceiver::DataReceiver(QObject *parent)
+	: QObject(parent), socket(new QTcpSocket(this)), buffer(), currentFrameSize(0), state(State::AwaitingHeader)
+{
 	connect(socket, &QTcpSocket::readyRead, this, &DataReceiver::readIncomingData);
 	connect(socket, &QTcpSocket::connected, this, [this]() { emit this->connected(true); });
 	connect(socket, &QTcpSocket::disconnected, this, [this]() { emit this->connected(false); });
 
-	buffers.resize(BUFFERS);
+	frameDataBuffers.resize(BUFFERS);
 	for (int i = 0; i < BUFFERS; ++i) {
-		buffers[i].resize(128); // Initial size, adjust as needed
+		frameDataBuffers[i].resize(128); // Initial size, adjust as needed
 	}
 }
 
 DataReceiver::~DataReceiver() {
-	//no need for manual cleanup due to smart pointers and Qt parent-child mechanism
+	// No need for manual cleanup due to smart pointers and Qt parent-child mechanism
+}
+
+void DataReceiver::processBuffer() {
+	if (buffer.size() < static_cast<qint64>(this->bufferSize)) {
+		return; // Wait for more data
+	}
+	
+	// Extract frame data
+	QByteArray frameData = buffer.left(this->bufferSize);
+	buffer = buffer.mid(this->bufferSize);
+	
+	// Allocate and copy data
+	uchar* dataCopy = static_cast<uchar*>(malloc(this->bufferSize));
+	if (dataCopy) {
+		memcpy(dataCopy, frameData.constData(), this->bufferSize);
+		emit dataAvailable(dataCopy, this->params.bitDepth, this->params.samplesPerLine, this->params.linesPerFrame);
+	} else {
+		qWarning() << "Failed to allocate memory for frame data!";
+	}
 }
 
 void DataReceiver::readIncomingData() {
 	while (this->socket->bytesAvailable()) {
 		QByteArray incomingData = this->socket->readAll();
-		int spaceLeftInBuffer = this->bufferSize - this->bytesWritten;
-		int bytesToWrite = qMin(incomingData.size(), spaceLeftInBuffer);
+		buffer.append(incomingData);
+		if(this->params.useHeaders){
+			processBufferWithHeader();
+		} else {
+			processBuffer();
+		}
+	}
+}
 
-		//ensure the buffer is large enough to hold the incoming data
-		if(bytesToWrite > this->buffers[this->currentIndex].size() - this->bytesWritten){
-			this->buffers[this->currentIndex].resize(this->bytesWritten + bytesToWrite);
+void DataReceiver::processBufferWithHeader() {
+	QDataStream stream(buffer);
+	stream.setByteOrder(QDataStream::BigEndian);
+
+	while (true) {
+		if (state == State::AwaitingHeader) {
+			if (buffer.size() < HEADER_SIZE)
+				return;
+
+			quint32 startIdentifier;
+			quint32 bufferSizeInBytes;
+			quint16 frameWidth;
+			quint16 frameHeight;
+			quint8 bitDepth;
+
+			QByteArray headerData = buffer.left(HEADER_SIZE);
+			QDataStream headerStream(headerData);
+			headerStream.setByteOrder(QDataStream::BigEndian);
+			headerStream >> startIdentifier >> bufferSizeInBytes >> frameWidth >> frameHeight >> bitDepth;
+
+			if (startIdentifier != MAGIC_NUMBER) {
+				int magicIndex = buffer.indexOf(reinterpret_cast<const char*>(&MAGIC_NUMBER), sizeof(MAGIC_NUMBER));
+				if (magicIndex == -1) {
+					buffer.clear();
+					return;
+				} else {
+					buffer = buffer.mid(magicIndex);
+					continue;
+				}
+			}
+
+			if(!(bufferSizeInBytes > 0 && bufferSizeInBytes < MAX_ALLOWED_SIZE)) {
+				qDebug() << "DataReceiver: Invalid buffer size detected:" << bufferSizeInBytes;
+				qDebug() << "buffer size should be smaller than" << MAX_ALLOWED_SIZE;
+				return;
+			}
+
+			if(this->params.bitDepth != bitDepth || this->params.linesPerFrame != frameHeight || this->params.samplesPerLine != frameWidth || this->currentFrameSize != bufferSizeInBytes) {
+				int bytesPerSample = qCeil(static_cast<double>(bitDepth) / 8.0);
+				int bytesPerFrame = bytesPerSample * frameWidth * frameHeight;
+
+				ReceiverParameters newParams;
+				newParams.bitDepth = bitDepth;
+				newParams.framesPerBuffer = bufferSizeInBytes/bytesPerFrame;
+				newParams.ip = params.ip;
+				newParams.linesPerFrame = frameHeight;
+				newParams.port = params.port;
+				newParams.samplesPerLine = frameWidth;
+				newParams.useHeaders = params.useHeaders;
+				this->updateParams(newParams);
+
+				emit paramsChanged(newParams);
+			}
+
+			currentFrameSize = bufferSizeInBytes;
+			currentFrameWidth = frameWidth;
+			currentFrameHeight = frameHeight;
+			currentBitDepth = bitDepth;
+
+			buffer = buffer.mid(HEADER_SIZE);
+			state = State::AwaitingFrame;
 		}
 
-		//copy the incoming data into the current buffer
-		std::copy(incomingData.begin(), incomingData.begin() + bytesToWrite, this->buffers[currentIndex].begin() + bytesWritten);
-		this->bytesWritten += bytesToWrite;
+		if (state == State::AwaitingFrame) {
+			if (buffer.size() < static_cast<qint64>(this->bufferSize)){
+				return;
+			}
 
-		//check if the current buffer is filled
-		if(this->bytesWritten >= this->bufferSize){
-			//emit the signal with the buffer's data
-			emit dataAvailable(static_cast<void*>(this->buffers[currentIndex].data()), this->params.bitDepth, this->params.samplesPerLine, this->params.linesPerFrame);
+			QByteArray frameData = buffer.left(currentFrameSize);
+			buffer = buffer.mid(currentFrameSize);
 
-			//prepare for the next buffer
-			this->currentIndex = (this->currentIndex + 1) % BUFFERS;
-			this->bytesWritten = 0; // Reset for the next buffer
+			uchar* dataCopy = static_cast<uchar*>(malloc(currentFrameSize));
+			if(dataCopy){
+				memcpy(dataCopy, frameData.constData(), currentFrameSize);
+				//emit dataAvailable(dataCopy, static_cast<unsigned int>(currentBitDepth), static_cast<unsigned int>(currentFrameWidth), static_cast<unsigned int>(currentFrameHeight));
+				emit dataAvailable(dataCopy, static_cast<unsigned int>(this->params.bitDepth), static_cast<unsigned int>(this->params.samplesPerLine), static_cast<unsigned int>(this->params.linesPerFrame));
+			} else{
+				qDebug() << "DataReceiver: Failed to allocate memory for frame data!";
+			}
+
+			state = State::AwaitingHeader;
 		}
 	}
 }
@@ -73,11 +170,7 @@ void DataReceiver::updateParams(ReceiverParameters newParams) {
 	this->params = newParams;
 
 	int bytesPerSample = qCeil(static_cast<double>(this->params.bitDepth) / 8.0);
-	bufferSize = this->params.samplesPerLine * this->params.linesPerFrame * this->params.framesPerBuffer * bytesPerSample;
-
-	for (auto &buffer : this->buffers) {
-		buffer.resize(bufferSize); //adjust buffer size based on new parameters
-	}
+	this->bufferSize = this->params.samplesPerLine * this->params.linesPerFrame * this->params.framesPerBuffer * bytesPerSample;
 }
 
 void DataReceiver::updateParamsAndConnect(ReceiverParameters params) {
@@ -87,21 +180,23 @@ void DataReceiver::updateParamsAndConnect(ReceiverParameters params) {
 
 void DataReceiver::onConnect() {
 	if(this->socket->state() == QTcpSocket::ConnectedState || this->socket->state() == QTcpSocket::ConnectingState){
-		this->socket->abort(); //ensure previous connections are closed before reconnecting
+		this->socket->abort(); // Ensure previous connections are closed before reconnecting
 	}
-	socket->connectToHost(params.ip, params.port);
+	socket->connectToHost(this->params.ip, this->params.port);
 }
 
 void DataReceiver::onDisconnect() {
 	socket->disconnectFromHost();
-	bytesWritten = 0; //reset write position for new data
 }
 
 void DataReceiver::onRemoteStartClicked() {
 	socket->write("remote_start");
 }
 
-
 void DataReceiver::onRemoteStopClicked() {
 	socket->write("remote_stop");
+}
+
+void DataReceiver::setUseHeaders(bool enable) {
+	this->params.useHeaders = enable;
 }
